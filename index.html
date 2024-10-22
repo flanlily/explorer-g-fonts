@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全フォントプレビュー & リアルタイムフォント変換</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            max-width: 1200px;
+            margin: auto;
+        }
+        .output {
+            margin-top: 20px;
+            font-size: 24px;
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        }
+        .textbox, .searchbox {
+            width: 100%;
+            padding: 10px;
+            font-size: 18px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .font-preview {
+            margin: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            display: inline-block;
+            width: calc(33% - 20px); /* 3列表示 */
+            box-sizing: border-box;
+        }
+        .font-preview h3 {
+            margin: 0;
+            padding: 0;
+        }
+        #loadMoreButton {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 20px;
+            cursor: pointer;
+            border: none;
+            background-color: #007BFF;
+            color: white;
+            border-radius: 5px;
+        }
+        .spoiler {
+            color: #000;
+            background-color: #000;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Amatic+SC&family=Barlow&family=Bebas+Neue&family=Crimson+Pro&family=Dancing+Script&family=Days+One&family=Exo+2&family=Fontdiner+Swanky&family=Gloria+Hallelujah&family=Lato&family=Montserrat&family=Nunito&family=Open+Sans&family=Poppins&family=Press+Start+2P&family=Roboto&family=Raleway&family=Source+Sans+Pro&family=Ubuntu&family=Varela+Round&family=Zilla+Slab&family=Noto+Serif+SC&display=swap" rel="stylesheet">
+</head>
+<body>
+    <h1>全フォントプレビュー & リアルタイムフォント変換</h1>
+    <h4 id="promptText">フォントを選択して文章を入力してください</h4>
+    <h5>コマンド:</h5>
+    <ul>
+        <li>/B - 太文字</li>
+        <li>/I - 斜体</li>
+        <li>/N - 取り消し線</li>
+        <li>/S - スポイラー</li>
+    </ul>
+
+    <!-- テキスト入力用ボックス -->
+    <input type="text" class="textbox" id="inputText" placeholder="ここに文章を入力してください">
+
+    <!-- フォント検索ボックス -->
+    <input type="text" class="searchbox" id="searchText" placeholder="フォントを検索">
+
+    <!-- フォントプレビュー表示 -->
+    <div id="fontPreviewContainer"></div>
+
+    <!-- もっと見るボタン -->
+    <button id="loadMoreButton" style="display: none;">もっと見る</button>
+
+    <div class="output" id="outputText"></div>
+
+    <script>
+        const inputText = document.getElementById('inputText');
+        const outputText = document.getElementById('outputText');
+        const searchText = document.getElementById('searchText');
+        const fontPreviewContainer = document.getElementById('fontPreviewContainer');
+        const loadMoreButton = document.getElementById('loadMoreButton');
+        let fonts = []; // 全フォントのリスト
+        let displayedFonts = 0; // 現在表示されているフォント数
+
+        // Google Fonts APIからフォントリストを取得
+        async function getFonts() {
+            const apiKey = 'AIzaSyBJWx9IqAoO-OfBWXZo4gVKh7hwadKwn_M';
+            const apiUrl = `https://www.googleapis.com/webfonts/v1/webfonts?key=${apiKey}`;
+            const response = await fetch(apiUrl);
+            const data = await response.json();
+            fonts = data.items; // 全フォントを保存
+            return fonts;
+        }
+
+        // フォントプレビューを表示
+        function displayFontPreview(fonts) {
+            const text = inputText.value || 'プレビュー';
+            fonts.forEach(font => {
+                const link = document.createElement('link');
+                link.href = `https://fonts.googleapis.com/css2?family=${font.family.replace(/ /g, '+')}&display=swap`;
+                link.rel = 'stylesheet';
+                document.head.appendChild(link);
+
+                const fontPreviewDiv = document.createElement('div');
+                fontPreviewDiv.classList.add('font-preview');
+                fontPreviewDiv.style.fontFamily = `'${font.family}', sans-serif`;
+                fontPreviewDiv.innerHTML = `<h3>${font.family}</h3><p>${text}</p>`;
+                fontPreviewContainer.appendChild(fontPreviewDiv);
+            });
+        }
+
+        // フィルタリング機能
+        function filterFonts() {
+            const searchValue = searchText.value.toLowerCase();
+            const filteredFonts = fonts.filter(font => font.family.toLowerCase().includes(searchValue) || searchValue === ''); // 空文字でも表示
+            displayedFonts = 0;
+            fontPreviewContainer.innerHTML = ''; // クリア
+            loadMoreFonts(filteredFonts);
+        }
+
+        // もっと見る機能
+        function loadMoreFonts(filteredFonts) {
+            const fontCount = 10; // 読み込みフォント数のデフォルト
+            const fontsToLoad = filteredFonts.slice(displayedFonts, displayedFonts + fontCount);
+            displayFontPreview(fontsToLoad);
+            displayedFonts += fontsToLoad.length;
+
+            if (displayedFonts >= filteredFonts.length) {
+                loadMoreButton.style.display = 'none';
+            } else {
+                loadMoreButton.style.display = 'block';
+            }
+        }
+
+        // コマンドによるスタイル変更
+        function updateOutput() {
+            const text = inputText.value;
+            outputText.style.fontWeight = 'normal';
+            outputText.style.fontStyle = 'normal';
+            outputText.style.textDecoration = 'none';
+            outputText.classList.remove('spoiler');
+
+            if (text.includes('/B')) outputText.style.fontWeight = 'bold';
+            if (text.includes('/I')) outputText.style.fontStyle = 'italic';
+            if (text.includes('/N')) outputText.style.textDecoration = 'line-through';
+            if (text.includes('/S')) {
+                outputText.classList.add('spoiler');
+                outputText.textContent = 'Spoiler: ' + text.replace(/\/[BIUNS]/g, '');
+            } else {
+                outputText.textContent = text.replace(/\/[BIUNS]/g, '');
+            }
+        }
+
+        inputText.addEventListener('input', updateOutput);
+        searchText.addEventListener('input', filterFonts);
+        loadMoreButton.addEventListener('click', () => loadMoreFonts(fonts));
+
+        window.onload = async () => {
+            await getFonts();
+            filterFonts();
+        };
+    </script>
+</body>
+</html>
